@@ -197,7 +197,7 @@
 
             <!-- Main Menu Overlay -->
             <div id="overlay" class="absolute inset-0 glass-panel flex flex-col z-20 overflow-y-auto custom-scroll">
-                <div class="w-full h-full flex flex-col items-center justify-center min-h-[500px]"> <!-- Ensure min-height to enable scroll -->
+                <div class="w-full h-full flex flex-col items-center justify-center min-h-[500px]"> 
                     <div class="text-center px-6 w-full max-w-md flex flex-col h-full justify-center">
                         <div class="mb-2 text-5xl shrink-0">🏎️</div>
                         <h2 id="overlay-title" class="text-3xl font-black text-white mb-2 italic tracking-tighter uppercase shrink-0">F1 Snake</h2>
@@ -271,10 +271,53 @@
     </div>
 
     <script>
-        // --- Gemini AI Setup ---
+        // --- Fallback Radio System ---
         const apiKey = ""; 
 
-        async function callGemini(promptText) {
+        const RADIO_STRATEGY = [
+            "Tires are cooling down, push on the out lap.",
+            "Watch the track limits at Turn 4.",
+            "Gap to car behind is 2.5 seconds.",
+            "Rain expected in 5 minutes, keep pushing.",
+            "Switch to Plan B. Plan B.",
+            "Lift and coast, we need to save fuel.",
+            "Box this lap, box this lap. Undercut is on.",
+            "Keep the delta positive.",
+            "Traffic ahead, blue flags.",
+            "DRS enabled."
+        ];
+
+        const RADIO_GOOD = [
+            "Get in there! What a race!",
+            "Mega job! Absolutely mega!",
+            "P1! You are the World Champion!",
+            "Textbook driving. Simply lovely.",
+            "That's what we're talking about! Great work!",
+            "Fastest lap! Fantastic pace."
+        ];
+
+        const RADIO_BAD = [
+            "Box box, damage is terminal.",
+            "Are you okay? That was a big shunt.",
+            "Unbelievable. We threw it away.",
+            "Check the floor, check the floor.",
+            "That's a penalty. Careless driving.",
+            "We'll get them next time. Head down.",
+            "Engine failure. Stop the car.",
+            "No power, no power."
+        ];
+
+        function getFallbackMessage(type) {
+            let list = RADIO_STRATEGY;
+            if (type === 'good') list = RADIO_GOOD;
+            if (type === 'bad') list = RADIO_BAD;
+            return list[Math.floor(Math.random() * list.length)];
+        }
+
+        async function getTeamRadio(promptText, type) {
+            // If no API key, use fallback immediately
+            if (!apiKey) return getFallbackMessage(type);
+
             try {
                 const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
                     method: 'POST',
@@ -283,12 +326,13 @@
                         contents: [{ parts: [{ text: promptText }] }]
                     })
                 });
+                
                 if (!response.ok) throw new Error('API Error');
                 const data = await response.json();
                 return data.candidates[0].content.parts[0].text;
             } catch (error) {
-                console.error("Gemini Error:", error);
-                return "Radio interference... signal lost.";
+                console.log("Radio offline, switching to backup channel.");
+                return getFallbackMessage(type);
             }
         }
 
@@ -360,7 +404,7 @@
         });
 
         let snake = [];
-        let prevSnake = []; // For interpolation
+        let prevSnake = []; 
         let food = { x: 0, y: 0 };
         let velocity = { x: 0, y: 0 };
         let inputQueue = [];
@@ -385,7 +429,7 @@
         const closeSettings = () => {
             settingsOverlay.classList.add('hidden');
             overlay.classList.remove('hidden');
-            resizeGame(); // Recalculate size in case toggles changed
+            resizeGame(); 
         };
         btnCloseSettings.onclick = closeSettings;
         btnCloseX.onclick = closeSettings;
@@ -396,7 +440,9 @@
             aiContent.innerText = "Analyzing track conditions...";
             aiContent.classList.add('typing-cursor');
             const prompt = `You are a Formula 1 Race Engineer. Generate a short, 1-sentence strategic tip for Snake. Use F1 jargon. Serious but vague.`;
-            const text = await callGemini(prompt);
+            
+            const text = await getTeamRadio(prompt, 'strategy');
+            
             aiContent.classList.remove('typing-cursor');
             typeWriterEffect(text.trim());
         });
@@ -407,8 +453,12 @@
             aiContent.classList.add('typing-cursor');
             const isPB = finalScore >= highScore && finalScore > 0;
             const tone = isPB ? "Ecstatic" : "Disappointed or Neutral";
+            const type = isPB ? 'good' : 'bad';
+            
             const prompt = `F1 Race Engineer reacting to Snake game result. Score: ${finalScore}. Death: ${causeOfDeath}. Tone: ${tone}. Short, dramatic 1-sentence radio message. No emojis.`;
-            const text = await callGemini(prompt);
+            
+            const text = await getTeamRadio(prompt, type);
+            
             aiContent.classList.remove('typing-cursor');
             typeWriterEffect(text.trim());
         }
@@ -683,7 +733,7 @@
             const startX = Math.floor(TILE_COUNT_X / 2);
             const startY = Math.floor(TILE_COUNT_Y / 2);
             snake = [{x: startX, y: startY}, {x: startX, y: startY+1}, {x: startX, y: startY+2}];
-            prevSnake = snake.map(p => ({...p})); // Clone for initial interpolation
+            prevSnake = snake.map(p => ({...p})); 
             velocity = {x:0, y:-1}; 
             inputQueue = [];
             placeFood();
