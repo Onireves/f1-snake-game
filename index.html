@@ -1,1 +1,1011 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>F1 Snake Grand Prix</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* OLED Dark Mode */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+            background-color: #000000;
+            color: #ffffff;
+            touch-action: none;
+            overflow: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .glass-panel {
+            background: rgba(20, 20, 20, 0.85);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .control-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            touch-action: manipulation;
+        }
+        .control-btn:active { background: rgba(255, 255, 255, 0.3); }
+
+        .f1-light {
+            width: 40px; height: 40px; border-radius: 50%;
+            background-color: #333; border: 4px solid #111;
+            transition: background-color 0.1s;
+        }
+        .f1-light.red {
+            background-color: #ff0000;
+            box-shadow: 0 0 30px #ff0000;
+        }
+
+        /* Rainbow Text Effect */
+        .rainbow-text {
+            background: linear-gradient(to right, #ef4444, #eab308, #22c55e, #3b82f6, #a855f7);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            animation: rainbow 3s linear infinite;
+            background-size: 200% auto;
+        }
+        
+        @keyframes rainbow {
+            to { background-position: 200% center; }
+        }
+
+        /* Typing cursor for AI text */
+        .typing-cursor::after {
+            content: '|';
+            animation: blink 1s step-end infinite;
+        }
+        @keyframes blink { 50% { opacity: 0; } }
+
+        /* Custom Scrollbar */
+        .custom-scroll::-webkit-scrollbar { width: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+        
+        /* Joystick Styles */
+        #joystick-knob {
+            transform: translate(0px, 0px);
+            will-change: transform;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col bg-black select-none">
+
+    <!-- Top Bar -->
+    <div class="w-full px-6 pt-4 pb-2 flex justify-between items-end z-10 shrink-0 relative">
+        
+        <!-- Pause Button (Moved to Left) -->
+        <div class="flex flex-col justify-end">
+            <button id="btn-pause-header" class="text-gray-600 hover:text-white transition p-2 opacity-0 pointer-events-none duration-300 mb-1">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+            </button>
+        </div>
+
+        <!-- Score (Centered) -->
+        <div class="absolute left-1/2 -translate-x-1/2 bottom-2 text-center">
+            <div class="text-[10px] text-gray-500 font-bold tracking-widest">SCORE</div>
+            <div id="score" class="text-3xl font-black text-white font-mono transition-colors duration-300">0</div>
+        </div>
+
+        <!-- Best Score (Right) -->
+        <div class="flex flex-col items-end">
+            <div class="text-[10px] text-gray-500 font-bold tracking-widest">BEST</div>
+            <div id="high-score" class="text-3xl font-black text-gray-400 font-mono">0</div>
+        </div>
+    </div>
+
+    <!-- Game Wrapper -->
+    <div class="flex-1 flex flex-col items-center justify-center relative w-full overflow-hidden">
+        
+        <!-- Track Container -->
+        <div id="game-container" class="relative rounded-xl overflow-hidden bg-[#0a0a0a] border border-gray-800 shadow-[0_0_30px_rgba(255,0,0,0.1)] transition-all duration-500">
+            <canvas id="game-board" class="block cursor-crosshair"></canvas>
+            
+            <!-- Countdown Overlay -->
+            <div id="countdown-overlay" class="absolute inset-0 bg-black/90 flex flex-col items-center justify-center z-30 hidden">
+                <div class="flex gap-2 mb-8 scale-75 md:scale-100">
+                    <div class="f1-light" id="light-1"></div>
+                    <div class="f1-light" id="light-2"></div>
+                    <div class="f1-light" id="light-3"></div>
+                    <div class="f1-light" id="light-4"></div>
+                    <div class="f1-light" id="light-5"></div>
+                </div>
+                <h2 id="countdown-text" class="text-4xl font-black text-white italic tracking-tighter uppercase opacity-0">LIGHTS OUT</h2>
+            </div>
+
+            <!-- Pause Overlay -->
+            <div id="pause-overlay" class="absolute inset-0 bg-black/80 z-40 hidden flex flex-col items-center justify-center backdrop-blur-sm">
+                <h2 class="text-4xl font-black text-white mb-8 italic tracking-tighter uppercase">PIT STOP</h2>
+                <div class="flex flex-col gap-3 w-48">
+                    <button id="btn-resume" class="bg-white hover:bg-gray-200 text-black font-bold py-3 rounded uppercase tracking-wider shadow-lg transition-transform active:scale-95">Resume</button>
+                    <button id="btn-restart" class="bg-gray-800 hover:bg-gray-700 text-white font-bold py-3 rounded uppercase tracking-wider border border-gray-600 transition-transform active:scale-95">Restart</button>
+                    <button id="btn-quit" class="bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded uppercase tracking-wider shadow-lg transition-transform active:scale-95">Retire Car</button>
+                </div>
+            </div>
+
+            <!-- Settings Overlay (Revised) -->
+            <div id="settings-overlay" class="fixed inset-0 bg-black/90 z-50 hidden flex items-center justify-center p-4 backdrop-blur-md">
+                <div class="w-full max-w-sm bg-[#111] rounded-2xl flex flex-col max-h-full border border-gray-800 shadow-2xl">
+                    
+                    <!-- Header -->
+                    <div class="flex justify-between items-center p-4 border-b border-gray-800">
+                        <h2 class="text-xl font-black text-white italic tracking-tighter uppercase">Setup Car</h2>
+                        <button id="btn-close-x" class="text-gray-400 hover:text-white p-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                        </button>
+                    </div>
+                    
+                    <!-- Scrollable Content -->
+                    <div class="flex-1 overflow-y-auto p-5 space-y-6 custom-scroll">
+                        
+                        <!-- Pace Selector -->
+                        <div>
+                            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Engine Mode</p>
+                            <div class="flex gap-1">
+                                <button id="btn-pace-practice" class="flex-1 py-3 text-[10px] font-bold rounded bg-gray-800 text-gray-400 uppercase tracking-wide transition-all">Practice</button>
+                                <button id="btn-pace-saving" class="flex-1 py-3 text-[10px] font-bold rounded bg-yellow-600 text-white uppercase tracking-wide transition-all shadow-[0_0_10px_rgba(202,138,4,0.3)]">Fuel Save</button>
+                                <button id="btn-pace-race" class="flex-1 py-3 text-[10px] font-bold rounded bg-gray-800 text-gray-400 uppercase tracking-wide transition-all">Race</button>
+                            </div>
+                        </div>
+
+                        <!-- Ultrawide Toggle -->
+                        <div class="flex justify-between items-center py-2 border-t border-gray-800">
+                            <span class="text-xs font-bold text-gray-300 uppercase tracking-wide">Ultrawide</span>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="ultrawide-toggle" class="sr-only peer">
+                                <div class="w-10 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                            </label>
+                        </div>
+                        
+                        <!-- FPS Toggle -->
+                        <div class="flex justify-between items-center py-2 border-t border-gray-800">
+                            <span class="text-xs font-bold text-gray-300 uppercase tracking-wide">120 FPS Mode</span>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="fps-toggle" class="sr-only peer">
+                                <div class="w-10 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                            </label>
+                        </div>
+
+                        <!-- Input Mode -->
+                        <div class="pb-2">
+                            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 mt-2">Steering Config</p>
+                            <div class="flex gap-2">
+                                <button id="btn-mode-swipe" class="flex-1 py-3 text-xs font-bold rounded bg-red-600 text-white transition-all">Swipe</button>
+                                <button id="btn-mode-keys" class="flex-1 py-3 text-xs font-bold rounded bg-gray-800 text-gray-400 transition-all">Keys</button>
+                                <button id="btn-mode-joystick" class="flex-1 py-3 text-xs font-bold rounded bg-gray-800 text-gray-400 transition-all">Stick</button>
+                            </div>
+                        </div>
+                        
+                        <div class="h-4"></div>
+                    </div>
+
+                    <!-- Footer / Confirm Button -->
+                    <div class="p-4 border-t border-gray-800 bg-[#111]">
+                        <button id="btn-close-settings" class="w-full bg-white hover:bg-gray-200 text-black font-black text-lg py-3 rounded-xl uppercase italic tracking-wider transition-transform active:scale-95 shadow-lg">
+                            Save & Back
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Menu Overlay -->
+            <div id="overlay" class="absolute inset-0 glass-panel flex flex-col z-20 overflow-y-auto custom-scroll">
+                <div class="w-full h-full flex flex-col items-center justify-center min-h-[500px]"> 
+                    <div class="text-center px-6 w-full max-w-md flex flex-col h-full justify-center">
+                        <div class="mb-2 text-5xl shrink-0">🏎️</div>
+                        <h2 id="overlay-title" class="text-3xl font-black text-white mb-2 italic tracking-tighter uppercase shrink-0">F1 Snake</h2>
+                        
+                        <!-- Game Stats -->
+                        <div id="game-stats" class="hidden flex justify-center gap-6 my-2 animate-pulse shrink-0">
+                            <div class="text-center">
+                                <div class="text-[10px] text-gray-500 uppercase tracking-widest font-bold">Distance</div>
+                                <div id="stat-steps" class="text-xl font-mono font-black text-white">0</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="text-[10px] text-gray-500 uppercase tracking-widest font-bold">Turns</div>
+                                <div id="stat-turns" class="text-xl font-mono font-black text-white">0</div>
+                            </div>
+                        </div>
+
+                        <!-- AI Radio (Fixed Expansion) -->
+                        <div id="ai-radio-box" class="w-full max-h-[120px] overflow-y-auto custom-scroll bg-black/40 rounded border border-gray-700 p-3 mb-2 hidden shrink-0 text-left">
+                            <div class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1 sticky top-0 bg-black/0">📻 Team Radio</div>
+                            <p id="ai-content" class="text-xs font-mono text-green-400 break-words whitespace-pre-wrap leading-relaxed">
+                                Checking systems...
+                            </p>
+                        </div>
+
+                        <!-- Main Buttons -->
+                        <div class="flex flex-col gap-3 w-full mb-4 mt-2 shrink-0">
+                            <button id="start-btn" class="w-full bg-white hover:bg-gray-200 text-black font-black text-xl py-4 rounded-xl shadow-lg uppercase italic tracking-wider transition-transform active:scale-95">
+                                Start Race
+                            </button>
+                            
+                            <div class="flex gap-3">
+                                <button id="btn-settings" class="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs font-bold py-3 rounded-lg border border-gray-700 uppercase tracking-wider transition-transform active:scale-95">
+                                    ⚙️ Setup
+                                </button>
+                                <button id="btn-strategy" class="flex-1 bg-gray-800 hover:bg-gray-700 text-green-400 text-xs font-bold py-3 rounded-lg border border-gray-700 uppercase tracking-wider transition-transform active:scale-95">
+                                    📻 Strategy ✨
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Race History Section -->
+                        <div id="history-section" class="w-full hidden flex-col shrink-0 flex-1 min-h-[100px] overflow-hidden">
+                            <div class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 border-b border-gray-700 pb-1 text-left">Previous Results</div>
+                            <div id="score-list" class="flex flex-col gap-2 overflow-y-auto pr-1 custom-scroll max-h-[150px]">
+                                <!-- Scores injected here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- On Screen Controls Container -->
+        <div id="controls-container" class="mt-4 relative hidden shrink-0 flex justify-center pb-2">
+            <!-- D-Pad -->
+            <div id="dpad-area" class="w-[280px] h-[140px] relative hidden">
+                <button class="control-btn w-14 h-14 absolute left-1/2 -translate-x-1/2 top-0" id="btn-up">▲</button>
+                <button class="control-btn w-14 h-14 absolute left-1/2 -translate-x-1/2 bottom-0" id="btn-down">▼</button>
+                <button class="control-btn w-14 h-14 absolute top-1/2 -translate-y-1/2 left-4" id="btn-left">◀</button>
+                <button class="control-btn w-14 h-14 absolute top-1/2 -translate-y-1/2 right-4" id="btn-right">▶</button>
+            </div>
+            <!-- Joystick -->
+            <div id="joystick-area" class="w-[140px] h-[140px] relative hidden select-none touch-none">
+                <div class="w-full h-full rounded-full bg-gray-800/50 border border-gray-600 relative flex items-center justify-center">
+                    <div class="w-20 h-20 rounded-full bg-gray-700/30"></div>
+                    <div id="joystick-knob" class="w-16 h-16 rounded-full bg-red-600 shadow-[0_4px_0_rgba(0,0,0,0.3)] absolute border-4 border-red-500"></div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- Fallback Radio System ---
+        const apiKey = ""; 
+
+        const RADIO_STRATEGY = [
+            "Tires are cooling down, push on the out lap.",
+            "Watch the track limits at Turn 4.",
+            "Gap to car behind is 2.5 seconds.",
+            "Rain expected in 5 minutes, keep pushing.",
+            "Switch to Plan B. Plan B.",
+            "Lift and coast, we need to save fuel.",
+            "Box this lap, box this lap. Undercut is on.",
+            "Keep the delta positive.",
+            "Traffic ahead, blue flags.",
+            "DRS enabled."
+        ];
+
+        const RADIO_GOOD = [
+            "Get in there! What a race!",
+            "Mega job! Absolutely mega!",
+            "P1! You are the World Champion!",
+            "Textbook driving. Simply lovely.",
+            "That's what we're talking about! Great work!",
+            "Fastest lap! Fantastic pace."
+        ];
+
+        const RADIO_BAD = [
+            "Box box, damage is terminal.",
+            "Are you okay? That was a big shunt.",
+            "Unbelievable. We threw it away.",
+            "Check the floor, check the floor.",
+            "That's a penalty. Careless driving.",
+            "We'll get them next time. Head down.",
+            "Engine failure. Stop the car.",
+            "No power, no power."
+        ];
+
+        function getFallbackMessage(type) {
+            let list = RADIO_STRATEGY;
+            if (type === 'good') list = RADIO_GOOD;
+            if (type === 'bad') list = RADIO_BAD;
+            return list[Math.floor(Math.random() * list.length)];
+        }
+
+        async function getTeamRadio(promptText, type) {
+            // If no API key, use fallback immediately
+            if (!apiKey) return getFallbackMessage(type);
+
+            try {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: promptText }] }]
+                    })
+                });
+                
+                if (!response.ok) throw new Error('API Error');
+                const data = await response.json();
+                return data.candidates[0].content.parts[0].text;
+            } catch (error) {
+                console.log("Radio offline, switching to backup channel.");
+                return getFallbackMessage(type);
+            }
+        }
+
+        // --- Game Setup ---
+        const canvas = document.getElementById('game-board');
+        const ctx = canvas.getContext('2d');
+        const scoreEl = document.getElementById('score');
+        const highScoreEl = document.getElementById('high-score');
+        const overlay = document.getElementById('overlay');
+        const settingsOverlay = document.getElementById('settings-overlay');
+        const startBtn = document.getElementById('start-btn');
+        const btnSettings = document.getElementById('btn-settings');
+        const btnCloseSettings = document.getElementById('btn-close-settings');
+        const btnCloseX = document.getElementById('btn-close-x');
+        const btnStrategy = document.getElementById('btn-strategy');
+        const historySection = document.getElementById('history-section');
+        const scoreListEl = document.getElementById('score-list');
+        const aiRadioBox = document.getElementById('ai-radio-box');
+        const aiContent = document.getElementById('ai-content');
+        const ultrawideToggle = document.getElementById('ultrawide-toggle');
+        const fpsToggle = document.getElementById('fps-toggle');
+        const gameStatsEl = document.getElementById('game-stats');
+        const statStepsEl = document.getElementById('stat-steps');
+        const statTurnsEl = document.getElementById('stat-turns');
+        const btnPauseHeader = document.getElementById('btn-pause-header');
+        const pauseOverlay = document.getElementById('pause-overlay');
+        const btnResume = document.getElementById('btn-resume');
+        const btnRestart = document.getElementById('btn-restart');
+        const btnQuit = document.getElementById('btn-quit');
+        
+        // Control Selectors
+        const btnModeSwipe = document.getElementById('btn-mode-swipe');
+        const btnModeKeys = document.getElementById('btn-mode-keys');
+        const btnModeJoystick = document.getElementById('btn-mode-joystick');
+        
+        const controlsContainer = document.getElementById('controls-container');
+        const dpadArea = document.getElementById('dpad-area');
+        const joystickArea = document.getElementById('joystick-area');
+        const joystickKnob = document.getElementById('joystick-knob');
+
+        // Pace Selectors
+        const btnPacePractice = document.getElementById('btn-pace-practice');
+        const btnPaceSaving = document.getElementById('btn-pace-saving');
+        const btnPaceRace = document.getElementById('btn-pace-race');
+
+        // Config
+        const GRID_SIZE = 25; 
+        let TILE_COUNT = 15; 
+        let GAME_SPEED = 110;
+        let isUltrawide = false;
+        let isSmoothMode = false;
+        let gamePace = 'saving'; 
+        
+        let controlMode = 'swipe';
+        let score = 0;
+        let highScore = parseInt(localStorage.getItem('f1SnakeHighScore') || '0');
+        
+        // Stats Tracking
+        let totalSteps = 0;
+        let totalTurns = 0;
+
+        // History Migration Logic
+        let rawHistory = JSON.parse(localStorage.getItem('f1SnakeHistory') || '[]');
+        let previousScores = rawHistory.map(entry => {
+            if (typeof entry === 'number') {
+                return { score: entry, date: new Date().toISOString() };
+            }
+            return entry;
+        });
+
+        let snake = [];
+        let prevSnake = []; 
+        let food = { x: 0, y: 0 };
+        let velocity = { x: 0, y: 0 };
+        let inputQueue = [];
+        let gameLoopId = null;
+        let isGameRunning = false;
+        let isPaused = false;
+        let timeAccumulator = 0;
+        let lastTime = 0;
+        let countdownInterval = null;
+
+        const TEAM_COLORS = ['#FF2800', '#0600EF', '#00D2BE', '#FF8700', '#006F62', '#0090FF', '#FFFFFF', '#52E252', '#6CD3BF'];
+
+        highScoreEl.innerText = highScore;
+        renderHistory();
+
+        // --- Navigation ---
+        btnSettings.onclick = () => {
+            overlay.classList.add('hidden');
+            settingsOverlay.classList.remove('hidden');
+        };
+
+        const closeSettings = () => {
+            settingsOverlay.classList.add('hidden');
+            overlay.classList.remove('hidden');
+            resizeGame(); 
+        };
+        btnCloseSettings.onclick = closeSettings;
+        btnCloseX.onclick = closeSettings;
+
+        // --- AI Features ---
+        btnStrategy.addEventListener('click', async () => {
+            aiRadioBox.classList.remove('hidden');
+            aiContent.innerText = "Analyzing track conditions...";
+            aiContent.classList.add('typing-cursor');
+            const prompt = `You are a Formula 1 Race Engineer. Generate a short, 1-sentence strategic tip for Snake. Use F1 jargon. Serious but vague.`;
+            
+            const text = await getTeamRadio(prompt, 'strategy');
+            
+            aiContent.classList.remove('typing-cursor');
+            typeWriterEffect(text.trim());
+        });
+
+        async function generatePostRaceAnalysis(finalScore, causeOfDeath) {
+            aiRadioBox.classList.remove('hidden');
+            aiContent.innerText = "Connecting to pit wall...";
+            aiContent.classList.add('typing-cursor');
+            const isPB = finalScore >= highScore && finalScore > 0;
+            const tone = isPB ? "Ecstatic" : "Disappointed or Neutral";
+            const type = isPB ? 'good' : 'bad';
+            
+            const prompt = `F1 Race Engineer reacting to Snake game result. Score: ${finalScore}. Death: ${causeOfDeath}. Tone: ${tone}. Short, dramatic 1-sentence radio message. No emojis.`;
+            
+            const text = await getTeamRadio(prompt, type);
+            
+            aiContent.classList.remove('typing-cursor');
+            typeWriterEffect(text.trim());
+        }
+
+        function typeWriterEffect(text) {
+            aiContent.innerText = "";
+            let i = 0;
+            const speed = 30; 
+            function type() {
+                if (i < text.length) {
+                    aiContent.innerHTML += text.charAt(i);
+                    i++;
+                    setTimeout(type, speed);
+                }
+            }
+            type();
+        }
+
+        // --- Settings Toggles ---
+        ultrawideToggle.addEventListener('change', (e) => {
+            isUltrawide = e.target.checked;
+        });
+
+        fpsToggle.addEventListener('change', (e) => {
+            isSmoothMode = e.target.checked;
+        });
+
+        function resizeGame() {
+            const padding = 16;
+            const topHeight = 60;
+            const controlsHeight = controlMode === 'keys' ? 160 : (controlMode === 'joystick' ? 160 : 0);
+            
+            const availableHeight = window.innerHeight - topHeight - controlsHeight - 30;
+
+            let maxWidth;
+            if (isUltrawide) {
+                maxWidth = window.innerWidth - (padding * 2);
+            } else {
+                maxWidth = Math.min(window.innerWidth - padding, 600);
+            }
+            
+            let tileCountX, tileCountY;
+            const sizeBasedOnHeight = Math.floor(availableHeight / GRID_SIZE) * GRID_SIZE;
+            
+            if (isUltrawide) {
+                const possibleWidth = Math.floor(maxWidth / GRID_SIZE) * GRID_SIZE;
+                canvas.height = sizeBasedOnHeight;
+                canvas.width = possibleWidth;
+                tileCountY = sizeBasedOnHeight / GRID_SIZE;
+                tileCountX = possibleWidth / GRID_SIZE;
+            } else {
+                const size = Math.min(maxWidth, availableHeight);
+                const adjustedSize = Math.floor(size / GRID_SIZE) * GRID_SIZE;
+                canvas.width = adjustedSize;
+                canvas.height = adjustedSize;
+                tileCountX = adjustedSize / GRID_SIZE;
+                tileCountY = adjustedSize / GRID_SIZE;
+            }
+
+            TILE_COUNT_X = tileCountX;
+            TILE_COUNT_Y = tileCountY;
+            
+            if (!isGameRunning && !isPaused && snake.length > 0) draw(1);
+        }
+        
+        let TILE_COUNT_X = 15;
+        let TILE_COUNT_Y = 15;
+        window.addEventListener('resize', resizeGame);
+
+        // --- Pace Selection Logic ---
+        function setPace(pace) {
+            gamePace = pace;
+            // Reset styles
+            [btnPacePractice, btnPaceSaving, btnPaceRace].forEach(btn => {
+                btn.className = "flex-1 py-3 text-[10px] font-bold rounded bg-gray-800 text-gray-400 uppercase tracking-wide transition-all";
+            });
+            
+            const activeClass = "flex-1 py-3 text-[10px] font-bold rounded text-white uppercase tracking-wide transition-all";
+            
+            if (pace === 'practice') {
+                btnPacePractice.className = activeClass + " bg-green-600 shadow-[0_0_10px_rgba(22,163,74,0.3)]";
+            } else if (pace === 'saving') {
+                btnPaceSaving.className = activeClass + " bg-yellow-600 shadow-[0_0_10px_rgba(202,138,4,0.3)]";
+            } else if (pace === 'race') {
+                btnPaceRace.className = activeClass + " bg-red-600 shadow-[0_0_10px_rgba(220,38,38,0.3)]";
+            }
+        }
+
+        btnPacePractice.onclick = () => setPace('practice');
+        btnPaceSaving.onclick = () => setPace('saving');
+        btnPaceRace.onclick = () => setPace('race');
+
+        // --- Control Modes ---
+        function setControlMode(mode) {
+            controlMode = mode;
+            // Reset Buttons
+            [btnModeSwipe, btnModeKeys, btnModeJoystick].forEach(btn => {
+                btn.className = "flex-1 py-3 text-xs font-bold rounded bg-gray-800 text-gray-400 transition-all";
+            });
+
+            // Set Active Button Style
+            const activeStyle = "flex-1 py-3 text-xs font-bold rounded bg-red-600 text-white transition-all";
+            if (mode === 'swipe') btnModeSwipe.className = activeStyle;
+            if (mode === 'keys') btnModeKeys.className = activeStyle;
+            if (mode === 'joystick') btnModeJoystick.className = activeStyle;
+
+            // Toggle Controls Visibility
+            if (mode === 'swipe') {
+                controlsContainer.classList.add('hidden');
+            } else {
+                controlsContainer.classList.remove('hidden');
+                if (mode === 'keys') {
+                    dpadArea.classList.remove('hidden');
+                    joystickArea.classList.add('hidden');
+                } else {
+                    dpadArea.classList.add('hidden');
+                    joystickArea.classList.remove('hidden');
+                }
+            }
+            
+            setTimeout(resizeGame, 50); 
+        }
+        btnModeSwipe.onclick = () => setControlMode('swipe');
+        btnModeKeys.onclick = () => setControlMode('keys');
+        btnModeJoystick.onclick = () => setControlMode('joystick');
+
+        // --- Joystick Logic ---
+        let joyStartX = 0, joyStartY = 0;
+        let joyIsActive = false;
+        
+        joystickArea.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            joyIsActive = true;
+            const rect = joystickArea.getBoundingClientRect();
+            // Center of the joystick area
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            
+            joyStartX = centerX;
+            joyStartY = centerY;
+            
+            updateJoystick(e.touches[0]);
+        }, {passive: false});
+
+        joystickArea.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (joyIsActive) updateJoystick(e.touches[0]);
+        }, {passive: false});
+
+        joystickArea.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            joyIsActive = false;
+            joystickKnob.style.transform = `translate(0px, 0px)`;
+        });
+
+        function updateJoystick(touch) {
+            const rect = joystickArea.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            
+            const dx = touch.clientX - centerX;
+            const dy = touch.clientY - centerY;
+            const distance = Math.sqrt(dx*dx + dy*dy);
+            const maxRadius = 35; // px
+
+            const angle = Math.atan2(dy, dx);
+            const cappedDist = Math.min(distance, maxRadius);
+            
+            const knobX = Math.cos(angle) * cappedDist;
+            const knobY = Math.sin(angle) * cappedDist;
+            
+            joystickKnob.style.transform = `translate(${knobX}px, ${knobY}px)`;
+
+            if (cappedDist > 10) {
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    if (dx > 0) go('r');
+                    else go('l');
+                } else {
+                    if (dy > 0) go('d');
+                    else go('u');
+                }
+            }
+        }
+
+        // --- Pause Logic ---
+        function togglePause() {
+            if (!isGameRunning && !isPaused) return; 
+
+            if (isPaused) {
+                isPaused = false;
+                isGameRunning = true;
+                pauseOverlay.classList.add('hidden');
+                lastTime = performance.now();
+                requestAnimationFrame(gameLoop);
+            } else {
+                isPaused = true;
+                isGameRunning = false;
+                cancelAnimationFrame(gameLoopId);
+                pauseOverlay.classList.remove('hidden');
+            }
+        }
+
+        function quitGame() {
+            isPaused = false;
+            isGameRunning = false;
+            cancelAnimationFrame(gameLoopId);
+            pauseOverlay.classList.add('hidden');
+            overlay.classList.remove('hidden');
+            btnPauseHeader.classList.add('opacity-0', 'pointer-events-none');
+        }
+
+        btnPauseHeader.onclick = togglePause;
+        btnResume.onclick = togglePause;
+        btnRestart.onclick = () => {
+            isPaused = false;
+            pauseOverlay.classList.add('hidden');
+            startSequence();
+        };
+        btnQuit.onclick = quitGame;
+
+        // --- Game Flow ---
+        function startSequence() {
+            overlay.classList.add('hidden');
+            const countdownOverlay = document.getElementById('countdown-overlay');
+            const countdownText = document.getElementById('countdown-text');
+            countdownOverlay.classList.remove('hidden');
+            
+            document.querySelectorAll('.f1-light').forEach(l => l.classList.remove('red'));
+            countdownText.style.opacity = '0';
+            updateScoreColor(); 
+            aiRadioBox.classList.add('hidden'); 
+            gameStatsEl.classList.add('hidden');
+            btnPauseHeader.classList.add('opacity-0', 'pointer-events-none');
+
+            if(countdownInterval) clearInterval(countdownInterval);
+            
+            initGameState();
+            draw(1);
+
+            let step = 0;
+            countdownInterval = setInterval(() => {
+                step++;
+                if (step <= 5) document.getElementById(`light-${step}`).classList.add('red');
+                else if (step === 6) {
+                    document.querySelectorAll('.f1-light').forEach(l => l.classList.remove('red'));
+                    countdownText.style.opacity = '1';
+                    clearInterval(countdownInterval);
+                    countdownInterval = null;
+                    setTimeout(() => {
+                        countdownOverlay.classList.add('hidden');
+                        isGameRunning = true;
+                        lastTime = performance.now();
+                        timeAccumulator = 0;
+                        btnPauseHeader.classList.remove('opacity-0', 'pointer-events-none');
+                        requestAnimationFrame(gameLoop);
+                    }, 500);
+                }
+            }, 600);
+        }
+
+        function initGameState() {
+            score = 0;
+            scoreEl.innerText = 0;
+            totalSteps = 0;
+            totalTurns = 0;
+            isPaused = false;
+            
+            if (gamePace === 'practice') GAME_SPEED = 150;
+            else if (gamePace === 'saving') GAME_SPEED = 110;
+            else if (gamePace === 'race') GAME_SPEED = 70;
+            
+            const startX = Math.floor(TILE_COUNT_X / 2);
+            const startY = Math.floor(TILE_COUNT_Y / 2);
+            snake = [{x: startX, y: startY}, {x: startX, y: startY+1}, {x: startX, y: startY+2}];
+            prevSnake = snake.map(p => ({...p})); // Clone for initial interpolation
+            velocity = {x:0, y:-1}; 
+            inputQueue = [];
+            placeFood();
+        }
+
+        function placeFood() {
+            let valid = false;
+            while (!valid) {
+                food.x = Math.floor(Math.random() * TILE_COUNT_X);
+                food.y = Math.floor(Math.random() * TILE_COUNT_Y);
+                valid = true;
+                for (let part of snake) if (part.x === food.x && part.y === food.y) valid = false;
+            }
+        }
+
+        function gameLoop(currentTime) {
+            if (!isGameRunning || isPaused) return;
+            gameLoopId = requestAnimationFrame(gameLoop);
+            
+            const deltaTime = currentTime - lastTime;
+            lastTime = currentTime;
+            timeAccumulator += deltaTime;
+
+            // Logic Update Loop (Fixed Time Step)
+            while (timeAccumulator >= GAME_SPEED) {
+                update();
+                timeAccumulator -= GAME_SPEED;
+            }
+
+            // Render with interpolation
+            const alpha = Math.min(timeAccumulator / GAME_SPEED, 1.0);
+            draw(isSmoothMode ? alpha : 1.0); // If not smooth mode, always draw at target position
+        }
+
+        function update() {
+            // Save state for interpolation before modifying
+            prevSnake = snake.map(p => ({...p}));
+
+            if (inputQueue.length > 0) {
+                velocity = inputQueue.shift();
+                totalTurns++;
+            }
+            const head = {x: snake[0].x + velocity.x, y: snake[0].y + velocity.y};
+
+            let deathCause = "";
+            if (head.x < 0 || head.x >= TILE_COUNT_X || head.y < 0 || head.y >= TILE_COUNT_Y) {
+                deathCause = "barrier collision";
+                gameOver(deathCause); 
+                return;
+            }
+            if (isSelfCollision(head)) {
+                deathCause = "collision with teammate";
+                gameOver(deathCause);
+                return;
+            }
+
+            totalSteps++;
+            snake.unshift(head);
+            if (head.x === food.x && head.y === food.y) {
+                score++; 
+                scoreEl.innerText = score;
+                updateScoreColor();
+                if(GAME_SPEED > 50) GAME_SPEED -= 1;
+                placeFood();
+            } else {
+                snake.pop();
+            }
+        }
+
+        function updateScoreColor() {
+            scoreEl.className = "text-3xl font-black font-mono transition-colors duration-300";
+            if (score > highScore && highScore > 0) {
+                scoreEl.className += " rainbow-text";
+            } else if (highScore > 0 && (highScore - score) <= 10) {
+                scoreEl.classList.add("text-yellow-400");
+            } else {
+                scoreEl.classList.add("text-white");
+            }
+        }
+
+        function isSelfCollision(head) {
+            return snake.some(part => part.x === head.x && part.y === head.y);
+        }
+
+        function draw(alpha) {
+            ctx.fillStyle = '#111'; ctx.fillRect(0,0,canvas.width, canvas.height);
+            
+            // Grid
+            ctx.strokeStyle = '#222'; ctx.lineWidth = 1; ctx.beginPath();
+            for(let i=0; i<=TILE_COUNT_X; i++) {
+                ctx.moveTo(i*GRID_SIZE,0); ctx.lineTo(i*GRID_SIZE,canvas.height);
+            }
+            for(let i=0; i<=TILE_COUNT_Y; i++) {
+                ctx.moveTo(0,i*GRID_SIZE); ctx.lineTo(canvas.width,i*GRID_SIZE);
+            }
+            ctx.stroke();
+
+            // Trophy
+            ctx.font = `${GRID_SIZE-8}px serif`; ctx.textAlign='center'; ctx.textBaseline='middle';
+            ctx.fillText('🏆', food.x*GRID_SIZE+GRID_SIZE/2, food.y*GRID_SIZE+GRID_SIZE/2+2);
+
+            // Snake
+            snake.forEach((part, i) => {
+                const team = TEAM_COLORS[i % TEAM_COLORS.length];
+                
+                // Interpolation Logic
+                let renderX = part.x;
+                let renderY = part.y;
+
+                if (isSmoothMode && prevSnake[i]) {
+                    const prev = prevSnake[i];
+                    renderX = prev.x + (part.x - prev.x) * alpha;
+                    renderY = prev.y + (part.y - prev.y) * alpha;
+                } else if (isSmoothMode && i === snake.length - 1 && prevSnake.length < snake.length) {
+                     // Growth logic handled by keeping static
+                }
+
+                let rot = 0;
+                
+                if (i===0) {
+                     if(velocity.x===1) rot=Math.PI/2; else if(velocity.x===-1) rot=-Math.PI/2;
+                     else if(velocity.y===1) rot=Math.PI; else rot=0;
+                } else {
+                    const prevPart = snake[i-1];
+                    const dx = prevPart.x - part.x; 
+                    const dy = prevPart.y - part.y;
+                    
+                    if(dx===1) rot=Math.PI/2; else if(dx===-1) rot=-Math.PI/2;
+                    else if(dy===1) rot=Math.PI; else rot=0;
+                }
+                
+                drawCar(renderX, renderY, team, rot);
+            });
+        }
+
+        function drawCar(x, y, color, rot) {
+            ctx.save();
+            ctx.translate(x*GRID_SIZE+GRID_SIZE/2, y*GRID_SIZE+GRID_SIZE/2);
+            ctx.rotate(rot);
+            const s = GRID_SIZE/100; ctx.scale(s,s);
+            // Simple F1 shape
+            ctx.fillStyle=color; ctx.fillRect(-20,20,40,15); // Wing
+            ctx.fillStyle='#333'; ctx.fillRect(-35,5,15,30); ctx.fillRect(20,5,15,30); // Rear Tires
+            ctx.fillStyle=color; ctx.beginPath(); ctx.moveTo(-10,25); ctx.lineTo(10,25); ctx.lineTo(8,-20); ctx.lineTo(-8,-20); ctx.fill(); // Body
+            ctx.fillStyle='#333'; ctx.fillRect(-30,-25,10,20); ctx.fillRect(20,-25,10,20); // Front Tires
+            ctx.fillStyle='#ccc'; ctx.fillRect(-25,-35,50,8); // Front Wing
+            ctx.fillStyle='#FFD700'; ctx.beginPath(); ctx.arc(0,0,5,0,Math.PI*2); ctx.fill(); // Helmet
+            ctx.restore();
+        }
+
+        function gameOver(cause) {
+            isGameRunning = false;
+            cancelAnimationFrame(gameLoopId);
+            btnPauseHeader.classList.add('opacity-0', 'pointer-events-none');
+            
+            const entry = { score: score, date: new Date().toISOString() };
+            previousScores.unshift(entry);
+            if(previousScores.length > 20) previousScores.pop(); 
+            localStorage.setItem('f1SnakeHistory', JSON.stringify(previousScores));
+
+            if (score > highScore) { 
+                highScore = score; 
+                localStorage.setItem('f1SnakeHighScore', highScore); 
+                highScoreEl.innerText = highScore; 
+            }
+
+            document.getElementById('overlay-title').innerText = "RACE FINISHED";
+            startBtn.innerText = "RACE AGAIN";
+            
+            statStepsEl.innerText = totalSteps;
+            statTurnsEl.innerText = totalTurns;
+            gameStatsEl.classList.remove('hidden');
+
+            renderHistory();
+            overlay.classList.remove('hidden');
+
+            generatePostRaceAnalysis(score, cause);
+        }
+
+        function renderHistory() {
+            if(previousScores.length === 0) {
+                historySection.classList.add('hidden');
+                return;
+            }
+            historySection.classList.remove('hidden');
+            scoreListEl.innerHTML = previousScores.map(entry => {
+                const s = entry.score !== undefined ? entry.score : entry; 
+                let dateStr = "";
+                if (entry.date) {
+                    const d = new Date(entry.date);
+                    const month = d.toLocaleString('default', { month: 'short' });
+                    const day = d.getDate();
+                    const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    dateStr = `<span class="text-[10px] text-gray-500 ml-auto">${month} ${day}, ${time}</span>`;
+                }
+                
+                return `
+                <div class="flex items-center bg-gray-900/50 p-2 rounded border border-gray-800">
+                    <span class="text-sm font-bold text-white font-mono mr-2">${s} Laps</span>
+                    ${dateStr}
+                </div>`;
+            }).join('');
+        }
+
+        // --- Inputs ---
+        function go(d) {
+            if (isPaused) return; 
+            const lastMove = inputQueue.length > 0 ? inputQueue[inputQueue.length - 1] : velocity;
+            let newMove = null;
+            
+            if(d==='u') newMove={x:0,y:-1};
+            if(d==='d') newMove={x:0,y:1};
+            if(d==='l') newMove={x:-1,y:0};
+            if(d==='r') newMove={x:1,y:0};
+            
+            if (!newMove) return;
+
+            if (lastMove.x + newMove.x === 0 && lastMove.y + newMove.y === 0) return;
+            if (lastMove.x === newMove.x && lastMove.y === newMove.y) return;
+            
+            if (inputQueue.length < 3) {
+                inputQueue.push(newMove);
+            }
+        }
+        document.addEventListener('keydown', e => {
+            // Pause
+            if(e.code === 'Escape' || e.code === 'KeyP') { togglePause(); return; }
+            
+            // Start / Restart on Space
+            if(e.code === 'Space') {
+                if (!isGameRunning && !isPaused && !overlay.classList.contains('hidden')) {
+                    startSequence();
+                    return;
+                }
+            }
+
+            // Direction controls
+            if(e.code==='ArrowUp') go('u'); if(e.code==='ArrowDown') go('d');
+            if(e.code==='ArrowLeft') go('l'); if(e.code==='ArrowRight') go('r');
+        });
+        
+        document.getElementById('btn-up').onmousedown = (e) => { e.preventDefault(); go('u'); };
+        document.getElementById('btn-up').ontouchstart = (e) => { e.preventDefault(); go('u'); };
+        document.getElementById('btn-down').onmousedown = (e) => { e.preventDefault(); go('d'); };
+        document.getElementById('btn-down').ontouchstart = (e) => { e.preventDefault(); go('d'); };
+        document.getElementById('btn-left').onmousedown = (e) => { e.preventDefault(); go('l'); };
+        document.getElementById('btn-left').ontouchstart = (e) => { e.preventDefault(); go('l'); };
+        document.getElementById('btn-right').onmousedown = (e) => { e.preventDefault(); go('r'); };
+        document.getElementById('btn-right').ontouchstart = (e) => { e.preventDefault(); go('r'); };
+
+        let tx=0, ty=0;
+        document.addEventListener('touchstart', e => {
+            if(e.target.closest('#controls-container')) return;
+            tx = e.changedTouches[0].screenX; ty = e.changedTouches[0].screenY;
+        }, {passive:false});
+        document.addEventListener('touchend', e => {
+            if(controlMode!=='swipe' || !isGameRunning || e.target.closest('#controls-container')) return;
+            const dx = e.changedTouches[0].screenX - tx; const dy = e.changedTouches[0].screenY - ty;
+            if(Math.abs(dx)>Math.abs(dy)) { if(Math.abs(dx)>30) dx>0?go('r'):go('l'); }
+            else { if(Math.abs(dy)>30) dy>0?go('d'):go('u'); }
+        }, {passive:false});
+
+        startBtn.onclick = startSequence;
+        
+        setControlMode('swipe');
+        resizeGame();
+        draw(1);
+
+    </script>
+</body>
+</html>
 
