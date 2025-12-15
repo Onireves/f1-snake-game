@@ -83,7 +83,7 @@
 <body class="h-screen w-screen flex flex-col bg-black select-none">
 
     <!-- Top Bar -->
-    <div class="w-full px-6 pt-4 pb-2 flex justify-between items-end z-10 shrink-0 relative">
+    <div id="top-bar" class="w-full px-4 py-3 flex justify-between items-end z-10 shrink-0 relative">
         
         <!-- Pause Button (Moved to Left) -->
         <div class="flex flex-col justify-end">
@@ -93,15 +93,15 @@
         </div>
 
         <!-- Score (Centered) -->
-        <div class="absolute left-1/2 -translate-x-1/2 bottom-2 text-center">
-            <div class="text-[10px] text-gray-500 font-bold tracking-widest">SCORE</div>
-            <div id="score" class="text-3xl font-black text-white font-mono transition-colors duration-300">0</div>
+        <div class="absolute left-1/2 -translate-x-1/2 bottom-3 text-center">
+            <div class="text-[9px] text-gray-500 font-bold tracking-widest uppercase">Score</div>
+            <div id="score" class="text-3xl font-black text-white font-mono transition-colors duration-300 leading-none">0</div>
         </div>
 
         <!-- Best Score (Right) -->
         <div class="flex flex-col items-end">
-            <div class="text-[10px] text-gray-500 font-bold tracking-widest">BEST</div>
-            <div id="high-score" class="text-3xl font-black text-gray-400 font-mono">0</div>
+            <div class="text-[9px] text-gray-500 font-bold tracking-widest uppercase">Best</div>
+            <div id="high-score" class="text-3xl font-black text-gray-400 font-mono leading-none">0</div>
         </div>
     </div>
 
@@ -255,7 +255,7 @@
         </div>
 
         <!-- On Screen Controls Container -->
-        <div id="controls-container" class="mt-4 relative hidden shrink-0 flex justify-center pb-2">
+        <div id="controls-container" class="mt-2 relative hidden shrink-0 flex justify-center pb-2">
             <!-- D-Pad -->
             <div id="dpad-area" class="w-[280px] h-[140px] relative hidden">
                 <button class="control-btn w-14 h-14 absolute left-1/2 -translate-x-1/2 top-0" id="btn-up">▲</button>
@@ -491,39 +491,32 @@
         });
 
         function resizeGame() {
-            const padding = 16;
-            const topHeight = 60;
-            const controlsHeight = controlMode === 'keys' ? 160 : (controlMode === 'joystick' ? 160 : 0);
+            // Minimized padding to maximize space
+            const padding = 8; 
             
-            const availableHeight = window.innerHeight - topHeight - controlsHeight - 30;
+            const topBar = document.getElementById('top-bar');
+            const topHeight = topBar ? topBar.offsetHeight : 60;
+            
+            const controlsHeight = controlMode === 'keys' ? 150 : (controlMode === 'joystick' ? 150 : 0);
+            
+            // Calculate available height
+            const availableHeight = window.innerHeight - topHeight - controlsHeight - 16; 
 
-            let maxWidth;
-            if (isUltrawide) {
-                maxWidth = window.innerWidth - (padding * 2);
-            } else {
-                maxWidth = Math.min(window.innerWidth - padding, 600);
+            let targetWidth = window.innerWidth - (padding * 2);
+            
+            if (!isUltrawide) {
+                targetWidth = Math.min(targetWidth, 600);
             }
             
-            let tileCountX, tileCountY;
-            const sizeBasedOnHeight = Math.floor(availableHeight / GRID_SIZE) * GRID_SIZE;
+            // Calculate Grid Dimensions
+            const maxCols = Math.floor(targetWidth / GRID_SIZE);
+            const maxRows = Math.floor(availableHeight / GRID_SIZE);
             
-            if (isUltrawide) {
-                const possibleWidth = Math.floor(maxWidth / GRID_SIZE) * GRID_SIZE;
-                canvas.height = sizeBasedOnHeight;
-                canvas.width = possibleWidth;
-                tileCountY = sizeBasedOnHeight / GRID_SIZE;
-                tileCountX = possibleWidth / GRID_SIZE;
-            } else {
-                const size = Math.min(maxWidth, availableHeight);
-                const adjustedSize = Math.floor(size / GRID_SIZE) * GRID_SIZE;
-                canvas.width = adjustedSize;
-                canvas.height = adjustedSize;
-                tileCountX = adjustedSize / GRID_SIZE;
-                tileCountY = adjustedSize / GRID_SIZE;
-            }
-
-            TILE_COUNT_X = tileCountX;
-            TILE_COUNT_Y = tileCountY;
+            TILE_COUNT_X = Math.max(10, maxCols);
+            TILE_COUNT_Y = Math.max(10, maxRows);
+            
+            canvas.width = TILE_COUNT_X * GRID_SIZE;
+            canvas.height = TILE_COUNT_Y * GRID_SIZE;
             
             if (!isGameRunning && !isPaused && snake.length > 0) draw(1);
         }
@@ -701,7 +694,7 @@
             updateScoreColor(); 
             aiRadioBox.classList.add('hidden'); 
             gameStatsEl.classList.add('hidden');
-            btnPauseHeader.classList.add('opacity-0', 'pointer-events-none');
+            btnPauseHeader.classList.remove('opacity-0', 'pointer-events-none');
 
             if(countdownInterval) clearInterval(countdownInterval);
             
@@ -722,7 +715,6 @@
                         isGameRunning = true;
                         lastTime = performance.now();
                         timeAccumulator = 0;
-                        btnPauseHeader.classList.remove('opacity-0', 'pointer-events-none');
                         requestAnimationFrame(gameLoop);
                     }, 500);
                 }
@@ -969,22 +961,6 @@
                 triggerHaptic();
             }
         }
-        document.addEventListener('keydown', e => {
-            // Pause
-            if(e.code === 'Escape' || e.code === 'KeyP') { togglePause(); return; }
-            
-            // Start / Restart on Space
-            if(e.code === 'Space') {
-                if (!isGameRunning && !isPaused && !overlay.classList.contains('hidden')) {
-                    startSequence();
-                    return;
-                }
-            }
-
-            // Direction controls
-            if(e.code==='ArrowUp') go('u'); if(e.code==='ArrowDown') go('d');
-            if(e.code==='ArrowLeft') go('l'); if(e.code==='ArrowRight') go('r');
-        });
         
         // --- D-Pad Sliding Logic ---
         const dpadBtns = { 'btn-up': 'u', 'btn-down': 'd', 'btn-left': 'l', 'btn-right': 'r' };
@@ -1022,6 +998,23 @@
             btn.addEventListener('mousedown', (e) => { e.preventDefault(); go(dpadBtns[id]); });
         });
 
+        document.addEventListener('keydown', e => {
+            // Pause
+            if(e.code === 'Escape' || e.code === 'KeyP') { togglePause(); return; }
+            
+            // Start / Restart on Space
+            if(e.code === 'Space') {
+                if (!isGameRunning && !isPaused && !overlay.classList.contains('hidden')) {
+                    startSequence();
+                    return;
+                }
+            }
+
+            // Direction controls
+            if(e.code==='ArrowUp') go('u'); if(e.code==='ArrowDown') go('d');
+            if(e.code==='ArrowLeft') go('l'); if(e.code==='ArrowRight') go('r');
+        });
+        
         let tx=0, ty=0;
         document.addEventListener('touchstart', e => {
             if(e.target.closest('#controls-container')) return;
@@ -1043,4 +1036,3 @@
     </script>
 </body>
 </html>
-
