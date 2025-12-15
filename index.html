@@ -83,18 +83,21 @@
 
     <!-- Top Bar -->
     <div class="w-full px-6 pt-4 pb-2 flex justify-between items-end z-10 shrink-0 relative">
-        <div>
-            <div class="text-[10px] text-gray-500 font-bold tracking-widest">SCORE</div>
-            <div id="score" class="text-3xl font-black text-white font-mono transition-colors duration-300">0</div>
-        </div>
-
-        <!-- Pause Button (Centered) -->
-        <div class="absolute left-1/2 -translate-x-1/2 bottom-2">
-            <button id="btn-pause-header" class="text-gray-600 hover:text-white transition p-2 opacity-0 pointer-events-none duration-300">
+        
+        <!-- Pause Button (Moved to Left) -->
+        <div class="flex flex-col justify-end">
+            <button id="btn-pause-header" class="text-gray-600 hover:text-white transition p-2 opacity-0 pointer-events-none duration-300 mb-1">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
             </button>
         </div>
 
+        <!-- Score (Centered) -->
+        <div class="absolute left-1/2 -translate-x-1/2 bottom-2 text-center">
+            <div class="text-[10px] text-gray-500 font-bold tracking-widest">SCORE</div>
+            <div id="score" class="text-3xl font-black text-white font-mono transition-colors duration-300">0</div>
+        </div>
+
+        <!-- Best Score (Right) -->
         <div class="flex flex-col items-end">
             <div class="text-[10px] text-gray-500 font-bold tracking-widest">BEST</div>
             <div id="high-score" class="text-3xl font-black text-gray-400 font-mono">0</div>
@@ -733,7 +736,7 @@
             const startX = Math.floor(TILE_COUNT_X / 2);
             const startY = Math.floor(TILE_COUNT_Y / 2);
             snake = [{x: startX, y: startY}, {x: startX, y: startY+1}, {x: startX, y: startY+2}];
-            prevSnake = snake.map(p => ({...p})); 
+            prevSnake = snake.map(p => ({...p})); // Clone for initial interpolation
             velocity = {x:0, y:-1}; 
             inputQueue = [];
             placeFood();
@@ -959,7 +962,18 @@
             }
         }
         document.addEventListener('keydown', e => {
+            // Pause
             if(e.code === 'Escape' || e.code === 'KeyP') { togglePause(); return; }
+            
+            // Start / Restart on Space
+            if(e.code === 'Space') {
+                if (!isGameRunning && !isPaused && !overlay.classList.contains('hidden')) {
+                    startSequence();
+                    return;
+                }
+            }
+
+            // Direction controls
             if(e.code==='ArrowUp') go('u'); if(e.code==='ArrowDown') go('d');
             if(e.code==='ArrowLeft') go('l'); if(e.code==='ArrowRight') go('r');
         });
