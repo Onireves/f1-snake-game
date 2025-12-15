@@ -961,43 +961,6 @@
                 triggerHaptic();
             }
         }
-        
-        // --- D-Pad Sliding Logic ---
-        const dpadBtns = { 'btn-up': 'u', 'btn-down': 'd', 'btn-left': 'l', 'btn-right': 'r' };
-        let activeDpadBtn = null;
-
-        function handleDpad(e) {
-            e.preventDefault(); 
-            const touch = e.touches ? e.touches[0] : e;
-            const el = document.elementFromPoint(touch.clientX, touch.clientY);
-            if (!el) return;
-            
-            const btn = el.closest('.control-btn');
-            if (btn && dpadBtns[btn.id]) {
-                if (activeDpadBtn !== btn.id) {
-                    activeDpadBtn = btn.id;
-                    go(dpadBtns[btn.id]);
-                    // Feedback
-                    const originalBg = btn.style.background;
-                    btn.style.background = 'rgba(255, 255, 255, 0.3)';
-                    setTimeout(() => btn.style.background = originalBg, 150);
-                }
-            } else {
-                activeDpadBtn = null;
-            }
-        }
-
-        const dpadAreaEl = document.getElementById('dpad-area');
-        dpadAreaEl.addEventListener('touchstart', handleDpad, {passive: false});
-        dpadAreaEl.addEventListener('touchmove', handleDpad, {passive: false});
-        dpadAreaEl.addEventListener('touchend', (e) => { e.preventDefault(); activeDpadBtn = null; });
-        
-        // Mouse fallback
-        Object.keys(dpadBtns).forEach(id => {
-            const btn = document.getElementById(id);
-            btn.addEventListener('mousedown', (e) => { e.preventDefault(); go(dpadBtns[id]); });
-        });
-
         document.addEventListener('keydown', e => {
             // Pause
             if(e.code === 'Escape' || e.code === 'KeyP') { togglePause(); return; }
@@ -1015,6 +978,60 @@
             if(e.code==='ArrowLeft') go('l'); if(e.code==='ArrowRight') go('r');
         });
         
+        // --- D-Pad Sliding Logic ---
+        const dpadBtns = { 'btn-up': 'u', 'btn-down': 'd', 'btn-left': 'l', 'btn-right': 'r' };
+        let activeDpadBtn = null;
+
+        function highlightBtn(btn) {
+            const originalBg = btn.style.background;
+            btn.style.background = 'rgba(255, 255, 255, 0.4)';
+            setTimeout(() => btn.style.background = originalBg, 150);
+        }
+
+        function handleDpad(e) {
+            e.preventDefault(); 
+            
+            // Handle multiple touches (for rapid sequencing)
+            const touches = e.changedTouches;
+            
+            for (let i = 0; i < touches.length; i++) {
+                const touch = touches[i];
+                const el = document.elementFromPoint(touch.clientX, touch.clientY);
+                if (!el) continue;
+                
+                const btn = el.closest('.control-btn');
+                
+                if (btn && dpadBtns[btn.id]) {
+                    // Touchstart: Always trigger (allows rapid tapping)
+                    if (e.type === 'touchstart') {
+                        go(dpadBtns[btn.id]);
+                        highlightBtn(btn);
+                        activeDpadBtn = btn.id;
+                    }
+                    // Touchmove: Trigger only if entering a new button (sliding)
+                    else if (e.type === 'touchmove') {
+                        if (activeDpadBtn !== btn.id) {
+                            activeDpadBtn = btn.id;
+                            go(dpadBtns[btn.id]);
+                            highlightBtn(btn);
+                        }
+                    }
+                }
+            }
+        }
+
+        const dpadAreaEl = document.getElementById('dpad-area');
+        dpadAreaEl.addEventListener('touchstart', handleDpad, {passive: false});
+        dpadAreaEl.addEventListener('touchmove', handleDpad, {passive: false});
+        // Clear active button state on end, but rely on go() de-duping to prevent issues
+        dpadAreaEl.addEventListener('touchend', (e) => { e.preventDefault(); activeDpadBtn = null; });
+        
+        // Mouse fallback
+        Object.keys(dpadBtns).forEach(id => {
+            const btn = document.getElementById(id);
+            btn.addEventListener('mousedown', (e) => { e.preventDefault(); go(dpadBtns[id]); });
+        });
+
         let tx=0, ty=0;
         document.addEventListener('touchstart', e => {
             if(e.target.closest('#controls-container')) return;
