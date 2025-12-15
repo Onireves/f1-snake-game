@@ -257,11 +257,11 @@
         <!-- On Screen Controls Container -->
         <div id="controls-container" class="mt-2 relative hidden shrink-0 flex justify-center pb-2">
             <!-- D-Pad -->
-            <div id="dpad-area" class="w-[280px] h-[140px] relative hidden">
-                <button class="control-btn w-14 h-14 absolute left-1/2 -translate-x-1/2 top-0" id="btn-up">▲</button>
-                <button class="control-btn w-14 h-14 absolute left-1/2 -translate-x-1/2 bottom-0" id="btn-down">▼</button>
-                <button class="control-btn w-14 h-14 absolute top-1/2 -translate-y-1/2 left-4" id="btn-left">◀</button>
-                <button class="control-btn w-14 h-14 absolute top-1/2 -translate-y-1/2 right-4" id="btn-right">▶</button>
+            <div id="dpad-area" class="w-[340px] h-[200px] relative hidden">
+                <button class="control-btn w-20 h-20 text-3xl absolute left-1/2 -translate-x-1/2 top-0 active:scale-95 transition-transform" id="btn-up">▲</button>
+                <button class="control-btn w-20 h-20 text-3xl absolute left-1/2 -translate-x-1/2 bottom-0 active:scale-95 transition-transform" id="btn-down">▼</button>
+                <button class="control-btn w-20 h-20 text-3xl absolute top-1/2 -translate-y-1/2 left-2 active:scale-95 transition-transform" id="btn-left">◀</button>
+                <button class="control-btn w-20 h-20 text-3xl absolute top-1/2 -translate-y-1/2 right-2 active:scale-95 transition-transform" id="btn-right">▶</button>
             </div>
             <!-- Joystick -->
             <div id="joystick-area" class="w-[140px] h-[140px] relative hidden select-none touch-none">
@@ -497,7 +497,7 @@
             const topBar = document.getElementById('top-bar');
             const topHeight = topBar ? topBar.offsetHeight : 60;
             
-            const controlsHeight = controlMode === 'keys' ? 150 : (controlMode === 'joystick' ? 150 : 0);
+            const controlsHeight = controlMode === 'keys' ? 220 : (controlMode === 'joystick' ? 150 : 0);
             
             // Calculate available height
             const availableHeight = window.innerHeight - topHeight - controlsHeight - 16; 
