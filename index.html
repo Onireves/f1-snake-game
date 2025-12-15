@@ -81,23 +81,23 @@
 </head>
 <body class="h-screen w-screen flex flex-col bg-black select-none">
 
+    <!-- Invisible Input for Haptic Keyboard Hack -->
+    <input type="text" id="haptic-input" style="position: absolute; opacity: 0; top: -1000px; font-size: 16px;">
+
     <!-- Top Bar -->
     <div class="w-full px-6 pt-4 pb-2 flex justify-between items-end z-10 shrink-0 relative">
-        
-        <!-- Pause Button (Moved to Left) -->
-        <div class="flex flex-col justify-end">
-            <button id="btn-pause-header" class="text-gray-600 hover:text-white transition p-2 opacity-0 pointer-events-none duration-300 mb-1">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
-            </button>
-        </div>
-
-        <!-- Score (Centered) -->
-        <div class="absolute left-1/2 -translate-x-1/2 bottom-2 text-center">
+        <div>
             <div class="text-[10px] text-gray-500 font-bold tracking-widest">SCORE</div>
             <div id="score" class="text-3xl font-black text-white font-mono transition-colors duration-300">0</div>
         </div>
 
-        <!-- Best Score (Right) -->
+        <!-- Pause Button (Centered) -->
+        <div class="absolute left-1/2 -translate-x-1/2 bottom-2">
+            <button id="btn-pause-header" class="text-gray-600 hover:text-white transition p-2 opacity-0 pointer-events-none duration-300">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+            </button>
+        </div>
+
         <div class="flex flex-col items-end">
             <div class="text-[10px] text-gray-500 font-bold tracking-widest">BEST</div>
             <div id="high-score" class="text-3xl font-black text-gray-400 font-mono">0</div>
@@ -179,11 +179,15 @@
                         <!-- Input Mode -->
                         <div class="pb-2">
                             <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 mt-2">Steering Config</p>
-                            <div class="flex gap-2">
-                                <button id="btn-mode-swipe" class="flex-1 py-3 text-xs font-bold rounded bg-red-600 text-white transition-all">Swipe</button>
-                                <button id="btn-mode-keys" class="flex-1 py-3 text-xs font-bold rounded bg-gray-800 text-gray-400 transition-all">Keys</button>
-                                <button id="btn-mode-joystick" class="flex-1 py-3 text-xs font-bold rounded bg-gray-800 text-gray-400 transition-all">Stick</button>
+                            <div class="flex gap-1">
+                                <button id="btn-mode-swipe" class="flex-1 py-3 text-[10px] font-bold rounded bg-red-600 text-white transition-all">Swipe</button>
+                                <button id="btn-mode-keys" class="flex-1 py-3 text-[10px] font-bold rounded bg-gray-800 text-gray-400 transition-all">Keys</button>
+                                <button id="btn-mode-joystick" class="flex-1 py-3 text-[10px] font-bold rounded bg-gray-800 text-gray-400 transition-all">Stick</button>
+                                <button id="btn-mode-haptic" class="flex-1 py-3 text-[10px] font-bold rounded bg-gray-800 text-gray-400 transition-all">Haptic</button>
                             </div>
+                            <p id="haptic-hint" class="text-[9px] text-gray-500 mt-2 hidden">
+                                Uses keyboard I-J-K-L for controls.<br>Enables system haptic feedback on iOS.
+                            </p>
                         </div>
                         
                         <div class="h-4"></div>
@@ -365,11 +369,14 @@
         const btnResume = document.getElementById('btn-resume');
         const btnRestart = document.getElementById('btn-restart');
         const btnQuit = document.getElementById('btn-quit');
+        const hapticInput = document.getElementById('haptic-input');
         
         // Control Selectors
         const btnModeSwipe = document.getElementById('btn-mode-swipe');
         const btnModeKeys = document.getElementById('btn-mode-keys');
         const btnModeJoystick = document.getElementById('btn-mode-joystick');
+        const btnModeHaptic = document.getElementById('btn-mode-haptic');
+        const hapticHint = document.getElementById('haptic-hint');
         
         const controlsContainer = document.getElementById('controls-container');
         const dpadArea = document.getElementById('dpad-area');
@@ -558,21 +565,28 @@
         function setControlMode(mode) {
             controlMode = mode;
             // Reset Buttons
-            [btnModeSwipe, btnModeKeys, btnModeJoystick].forEach(btn => {
-                btn.className = "flex-1 py-3 text-xs font-bold rounded bg-gray-800 text-gray-400 transition-all";
+            [btnModeSwipe, btnModeKeys, btnModeJoystick, btnModeHaptic].forEach(btn => {
+                btn.className = "flex-1 py-3 text-[10px] font-bold rounded bg-gray-800 text-gray-400 transition-all";
             });
 
             // Set Active Button Style
-            const activeStyle = "flex-1 py-3 text-xs font-bold rounded bg-red-600 text-white transition-all";
+            const activeStyle = "flex-1 py-3 text-[10px] font-bold rounded bg-red-600 text-white transition-all";
             if (mode === 'swipe') btnModeSwipe.className = activeStyle;
             if (mode === 'keys') btnModeKeys.className = activeStyle;
             if (mode === 'joystick') btnModeJoystick.className = activeStyle;
+            if (mode === 'haptic') btnModeHaptic.className = activeStyle;
 
             // Toggle Controls Visibility
-            if (mode === 'swipe') {
+            if (mode === 'swipe' || mode === 'haptic') {
                 controlsContainer.classList.add('hidden');
+                if (mode === 'haptic') {
+                    hapticHint.classList.remove('hidden');
+                } else {
+                    hapticHint.classList.add('hidden');
+                }
             } else {
                 controlsContainer.classList.remove('hidden');
+                hapticHint.classList.add('hidden');
                 if (mode === 'keys') {
                     dpadArea.classList.remove('hidden');
                     joystickArea.classList.add('hidden');
@@ -587,6 +601,7 @@
         btnModeSwipe.onclick = () => setControlMode('swipe');
         btnModeKeys.onclick = () => setControlMode('keys');
         btnModeJoystick.onclick = () => setControlMode('joystick');
+        btnModeHaptic.onclick = () => setControlMode('haptic');
 
         // --- Joystick Logic ---
         let joyStartX = 0, joyStartY = 0;
@@ -646,6 +661,12 @@
             }
         }
 
+        function triggerHaptic() {
+            if (navigator.vibrate) {
+                navigator.vibrate(10); // Short vibration
+            }
+        }
+
         // --- Pause Logic ---
         function togglePause() {
             if (!isGameRunning && !isPaused) return; 
@@ -654,6 +675,10 @@
                 isPaused = false;
                 isGameRunning = true;
                 pauseOverlay.classList.add('hidden');
+                // Re-focus input if resuming in haptic mode
+                if (controlMode === 'haptic') {
+                    hapticInput.focus();
+                }
                 lastTime = performance.now();
                 requestAnimationFrame(gameLoop);
             } else {
@@ -661,6 +686,10 @@
                 isGameRunning = false;
                 cancelAnimationFrame(gameLoopId);
                 pauseOverlay.classList.remove('hidden');
+                // Blur to hide keyboard when paused
+                if (controlMode === 'haptic') {
+                    hapticInput.blur();
+                }
             }
         }
 
@@ -671,6 +700,9 @@
             pauseOverlay.classList.add('hidden');
             overlay.classList.remove('hidden');
             btnPauseHeader.classList.add('opacity-0', 'pointer-events-none');
+            if (controlMode === 'haptic') {
+                hapticInput.blur();
+            }
         }
 
         btnPauseHeader.onclick = togglePause;
@@ -689,6 +721,11 @@
             const countdownText = document.getElementById('countdown-text');
             countdownOverlay.classList.remove('hidden');
             
+            // If in Haptic mode, focus the invisible input
+            if (controlMode === 'haptic') {
+                hapticInput.focus();
+            }
+
             document.querySelectorAll('.f1-light').forEach(l => l.classList.remove('red'));
             countdownText.style.opacity = '0';
             updateScoreColor(); 
@@ -736,7 +773,7 @@
             const startX = Math.floor(TILE_COUNT_X / 2);
             const startY = Math.floor(TILE_COUNT_Y / 2);
             snake = [{x: startX, y: startY}, {x: startX, y: startY+1}, {x: startX, y: startY+2}];
-            prevSnake = snake.map(p => ({...p})); // Clone for initial interpolation
+            prevSnake = snake.map(p => ({...p})); 
             velocity = {x:0, y:-1}; 
             inputQueue = [];
             placeFood();
@@ -891,6 +928,9 @@
             isGameRunning = false;
             cancelAnimationFrame(gameLoopId);
             btnPauseHeader.classList.add('opacity-0', 'pointer-events-none');
+            if (controlMode === 'haptic') {
+                hapticInput.blur();
+            }
             
             const entry = { score: score, date: new Date().toISOString() };
             previousScores.unshift(entry);
@@ -959,8 +999,21 @@
             
             if (inputQueue.length < 3) {
                 inputQueue.push(newMove);
+                triggerHaptic();
             }
         }
+        
+        // Handle input from the invisible text field (Mobile Haptics)
+        hapticInput.addEventListener('input', (e) => {
+            if (!e.data) return;
+            const key = e.data.toLowerCase();
+            if (key === 'i') go('u');
+            if (key === 'k') go('d');
+            if (key === 'j') go('l');
+            if (key === 'l') go('r');
+            hapticInput.value = ''; // Clear to prevent buffer fill
+        });
+
         document.addEventListener('keydown', e => {
             // Pause
             if(e.code === 'Escape' || e.code === 'KeyP') { togglePause(); return; }
@@ -976,6 +1029,13 @@
             // Direction controls
             if(e.code==='ArrowUp') go('u'); if(e.code==='ArrowDown') go('d');
             if(e.code==='ArrowLeft') go('l'); if(e.code==='ArrowRight') go('r');
+            
+            // Also support IJKL on desktop/hardware keyboard if they prefer
+            const key = e.key.toLowerCase();
+            if (key === 'i') go('u');
+            if (key === 'k') go('d');
+            if (key === 'j') go('l');
+            if (key === 'l') go('r');
         });
         
         document.getElementById('btn-up').onmousedown = (e) => { e.preventDefault(); go('u'); };
@@ -1008,4 +1068,3 @@
     </script>
 </body>
 </html>
-
