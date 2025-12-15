@@ -34,6 +34,7 @@
             justify-content: center;
             font-size: 24px;
             touch-action: manipulation;
+            transition: background 0.1s;
         }
         .control-btn:active { background: rgba(255, 255, 255, 0.3); }
 
@@ -83,18 +84,21 @@
 
     <!-- Top Bar -->
     <div class="w-full px-6 pt-4 pb-2 flex justify-between items-end z-10 shrink-0 relative">
-        <div>
-            <div class="text-[10px] text-gray-500 font-bold tracking-widest">SCORE</div>
-            <div id="score" class="text-3xl font-black text-white font-mono transition-colors duration-300">0</div>
-        </div>
-
-        <!-- Pause Button (Centered) -->
-        <div class="absolute left-1/2 -translate-x-1/2 bottom-2">
-            <button id="btn-pause-header" class="text-gray-600 hover:text-white transition p-2 opacity-0 pointer-events-none duration-300">
+        
+        <!-- Pause Button (Moved to Left) -->
+        <div class="flex flex-col justify-end">
+            <button id="btn-pause-header" class="text-gray-600 hover:text-white transition p-2 opacity-0 pointer-events-none duration-300 mb-1">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
             </button>
         </div>
 
+        <!-- Score (Centered) -->
+        <div class="absolute left-1/2 -translate-x-1/2 bottom-2 text-center">
+            <div class="text-[10px] text-gray-500 font-bold tracking-widest">SCORE</div>
+            <div id="score" class="text-3xl font-black text-white font-mono transition-colors duration-300">0</div>
+        </div>
+
+        <!-- Best Score (Right) -->
         <div class="flex flex-col items-end">
             <div class="text-[10px] text-gray-500 font-bold tracking-widest">BEST</div>
             <div id="high-score" class="text-3xl font-black text-gray-400 font-mono">0</div>
@@ -982,14 +986,41 @@
             if(e.code==='ArrowLeft') go('l'); if(e.code==='ArrowRight') go('r');
         });
         
-        document.getElementById('btn-up').onmousedown = (e) => { e.preventDefault(); go('u'); };
-        document.getElementById('btn-up').ontouchstart = (e) => { e.preventDefault(); go('u'); };
-        document.getElementById('btn-down').onmousedown = (e) => { e.preventDefault(); go('d'); };
-        document.getElementById('btn-down').ontouchstart = (e) => { e.preventDefault(); go('d'); };
-        document.getElementById('btn-left').onmousedown = (e) => { e.preventDefault(); go('l'); };
-        document.getElementById('btn-left').ontouchstart = (e) => { e.preventDefault(); go('l'); };
-        document.getElementById('btn-right').onmousedown = (e) => { e.preventDefault(); go('r'); };
-        document.getElementById('btn-right').ontouchstart = (e) => { e.preventDefault(); go('r'); };
+        // --- D-Pad Sliding Logic ---
+        const dpadBtns = { 'btn-up': 'u', 'btn-down': 'd', 'btn-left': 'l', 'btn-right': 'r' };
+        let activeDpadBtn = null;
+
+        function handleDpad(e) {
+            e.preventDefault(); 
+            const touch = e.touches ? e.touches[0] : e;
+            const el = document.elementFromPoint(touch.clientX, touch.clientY);
+            if (!el) return;
+            
+            const btn = el.closest('.control-btn');
+            if (btn && dpadBtns[btn.id]) {
+                if (activeDpadBtn !== btn.id) {
+                    activeDpadBtn = btn.id;
+                    go(dpadBtns[btn.id]);
+                    // Feedback
+                    const originalBg = btn.style.background;
+                    btn.style.background = 'rgba(255, 255, 255, 0.3)';
+                    setTimeout(() => btn.style.background = originalBg, 150);
+                }
+            } else {
+                activeDpadBtn = null;
+            }
+        }
+
+        const dpadAreaEl = document.getElementById('dpad-area');
+        dpadAreaEl.addEventListener('touchstart', handleDpad, {passive: false});
+        dpadAreaEl.addEventListener('touchmove', handleDpad, {passive: false});
+        dpadAreaEl.addEventListener('touchend', (e) => { e.preventDefault(); activeDpadBtn = null; });
+        
+        // Mouse fallback
+        Object.keys(dpadBtns).forEach(id => {
+            const btn = document.getElementById(id);
+            btn.addEventListener('mousedown', (e) => { e.preventDefault(); go(dpadBtns[id]); });
+        });
 
         let tx=0, ty=0;
         document.addEventListener('touchstart', e => {
